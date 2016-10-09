@@ -1,0 +1,86 @@
+
+			README
+
+----------------------
+1. FILES IN SUBMISSION
+----------------------
+
+kernel.config				Config for minimal kernel build
+arch/x86/syscalls/syscall_32.tbl	Part of the patch to add the xcrypt system call
+					(syscalll_64.tbl was part of the system call. Since
+					our VM's are 32 bit, I made changes to syscall_32.tbl)
+fs/open.c				Part of the patch to add the xcrypt system call
+include/linux/syscalls.h		Part of the patch to add the xcrypt system call
+
+hw1/install_module.sh			To install the sys_xcrypt.ko module
+hw1/Makefile				To compile sys_xcrypt.c and xhw1.c
+hw1/README				README
+hw1/sys_xcrypt.c			Code for the xcrypt system call
+hw1/xcrypt.h				Header file containing the structure to pass as argument
+					from userland to the xcrypt system call
+hw1/xhw1.c				User code to call the xcrypt system call
+fs/namei.c				Changes to EXPORT get_name and put_name functions
+
+
+-----------------------------------------------------
+2. CHECKSUM ALGORITHM USED TO PASS PASSWORD FROM USER
+-----------------------------------------------------
+I have used the MD5 checksum algorithm to encrypt the human readable password before passing it to the kernel.
+
+-----------------------------------------
+3. APPROACH TO AVOID PARTIAL OUTPUT FILES
+-----------------------------------------
+
+I open 3 files in the kernel code.
+-infile: validate(file exists, file is regular etc.) and open the infle
+-outfile: validate(if the file exists is it same as infile? etc.) and open the outfile(create if does not exist).
+-outfile.tmp: create a temp outfile in which the encrypted/decrypted data will be written.
+
+In case the encryption/decryption fails for the infile at any point, I do the following steps:
+-unlink the temp file
+-unlink the output file IF AND ONLY IF it did not existed before and was created by the system call itself.
+
+In case the encryption/decryption process succeeds, I rename the outfile.tmp to outfile.
+
+-----------------------
+4. CIPHER AND MODE USED
+-----------------------
+
+#ifndef EXTRA_CREDIT, I have used the the 'aes' cipher (as mentioned in hw1.txt) and the 'ctr' mode for encryption/decryption.
+The major motivation behind choosing ctr mode was to avoid padding.
+
+
+------------------------
+5. EXTRA CREDIT - Use IV
+------------------------
+
+I have set the IV(16 bytes) as page_num(8 bytes) + inode number of temp outfile(8 bytes) for encryption.
+As I a encrypting/decrypting data in units equivalent of PAGE_SIZE, I have initialized the page_num=1 for in the initial IV.
+Thereafter I keep encrypting the page_num by 1 for each round of encryption/decryption/
+
+The IV is stored in the preamble during encryption and is used to set the first IV during decryption.
+
+----------------------------------
+6. EXTRA CREDIT - Multiple Ciphers
+----------------------------------
+
+I have added the support to pass the cipher name with the -c argument.
+Although, in the user code since I am always passing the 16byte hash of the passphrase as the key to the kernel,
+some of the ciphers like 'des' will throw error.
+As the professor said, its the responsibility of the user to pass the correct cipher-name/keysize combo.
+
+Ciphers for which I have tested the code: aes, blowfish.
+
+ALSO, in case #define EXTRA_CREDIT, then it is mandatory to pass some cipher name as argument.
+I could have defaulted to 'aes' but it was written in hw1.txt that 'The type of cipher must always be specified and must always be 
+a valid cipher that the Linux kernel CryptoAPI understands', hence I didn't do it.\
+
+-------------
+7. REFERENCES
+-------------
+
+http://lxr.fsl.cs.sunysb.edu/linux/source/fs/wrapfs/inode.c#L231
+http//www.openssl.org/docs/manmaster/crypto/md5.html
+http://stackoverflow.com/questions/7627723/how-to-create-a-md5-hash-of-a-string-in-c
+http://www.chronox.de/crypto-API/ch06s02.html
+http://stackoverflow.com/questions/17283121/correct-usage-of-crypto-api-in-linux
